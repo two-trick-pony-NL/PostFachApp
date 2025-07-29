@@ -10,6 +10,9 @@
     "slug": "PostFach",
     "ios": {
       "bundleIdentifier": "com.petervandoorn.PostFach"
+    },
+    "android": {
+      "package": "com.petervandoorn.PostFach"
     }
   }
 }

@@ -1,28 +1,44 @@
-import { View, Text, TextInput, Button, Alert } from 'react-native'
+import React, { useState } from 'react'
+import { View, TextInput, Button, Text, StyleSheet, Alert } from 'react-native'
 import { useAuthStore } from '../store/auth'
-import { supabase } from '../lib/supabase'
 
 export default function Login() {
-  const email = useAuthStore((s) => s.email)
-  const setEmail = useAuthStore((s) => s.setEmail)
+  const { login } = useAuthStore()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const signIn = async () => {
-    const { error } = await supabase.auth.signInWithOtp({ email })
-    if (error) Alert.alert('Error', error.message)
-    else Alert.alert('Check your email for the login link.')
+  const handleLogin = async () => {
+    setLoading(true)
+    const { error } = await login(email, password)
+    setLoading(false)
+    if (error) Alert.alert('Login failed', error)
   }
 
   return (
-    <View style={{ padding: 20 }}>
-      <Text>Email</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Login</Text>
       <TextInput
-        placeholder="email@example.com"
+        placeholder="Email"
+        autoCapitalize="none"
+        style={styles.input}
         value={email}
         onChangeText={setEmail}
-        autoCapitalize="none"
-        style={{ borderWidth: 1, padding: 10, marginVertical: 10 }}
       />
-      <Button title="Sign in with magic link" onPress={signIn} />
+      <TextInput
+        placeholder="Password"
+        secureTextEntry
+        style={styles.input}
+        value={password}
+        onChangeText={setPassword}
+      />
+      <Button title={loading ? 'Logging in...' : 'Login'} onPress={handleLogin} disabled={loading} />
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, justifyContent: 'center', padding: 20 },
+  input: { borderWidth: 1, borderColor: '#ccc', marginBottom: 12, padding: 10, borderRadius: 5 },
+  title: { fontSize: 24, marginBottom: 20, textAlign: 'center' },
+})

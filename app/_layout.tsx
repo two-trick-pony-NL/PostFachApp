@@ -1,16 +1,26 @@
-import { useEffect } from 'react'
-import { Slot, useRouter } from 'expo-router'
+import { useEffect, useState } from 'react'
+import { useRouter, usePathname, Slot } from 'expo-router'
 import { useAuthStore } from '../store/auth'
-import Login from './login'
 
-export default function Layout() {
-  const { session, initSession } = useAuthStore()
+export default function RootLayout() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const { isLoggedIn, checkSession } = useAuthStore()
+
+  const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
-    initSession()
+    checkSession().then(() => setIsReady(true))
   }, [])
 
-  if (!session) return <Login />
+  useEffect(() => {
+    if (!isReady) return
+    if (!isLoggedIn && pathname !== '/login') {
+      router.replace('/login')
+    } else if (isLoggedIn && pathname === '/login') {
+      router.replace('/protected/home')
+    }
+  }, [isLoggedIn, pathname, isReady])
 
   return <Slot />
 }
