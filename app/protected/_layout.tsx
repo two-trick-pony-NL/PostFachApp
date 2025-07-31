@@ -5,8 +5,8 @@ export default function ProtectedLayout() {
     <Tabs
       screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen name="home/index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="contacts/index" options={{ title: 'Contacts' }} />
+      <Tabs.Screen name="home" options={{ title: 'Home' }} />
+      <Tabs.Screen name="contacts" options={{ title: 'Contacts' }} />
     </Tabs>
   )
 }

@@ -7,7 +7,7 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().session?.access_token
-  console.log('Token before request:', token)
+  //console.log('Token before request:', token)
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -23,6 +23,22 @@ export async function getThreads() {
 
 export async function getThreadById(threadId) {
   const response = await api.get(`/api/emails/threads/${threadId}/`)
+  return response.data
+}
+
+// Attachments
+export async function listAttachments() {
+  const response = await api.get('/api/emails/attachments/')
+  return response.data
+}
+
+export async function getAttachmentById(attachmentId) {
+  const response = await api.get(`/api/emails/attachments/${attachmentId}/`)
+  return response.data
+}
+
+export async function downloadAttachmentById(attachmentId) {
+  const response = await api.get(`/api/emails/attachments/${attachmentId}/download`)
   return response.data
 }
 

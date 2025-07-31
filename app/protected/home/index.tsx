@@ -1,20 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { View, Text, FlatList, TouchableOpacity, SafeAreaView } from 'react-native'
-import { getThreads } from '../../../lib/api'
 import { useRouter } from 'expo-router'
+import { useThreadStore } from '../../../store/threads'
 
 export default function ThreadListScreen() {
-  const [threads, setThreads] = useState([])
+  const { threads, fetchThreads, loading } = useThreadStore()
   const router = useRouter()
 
   useEffect(() => {
-    getThreads().then(setThreads)
-  }, [])
+    fetchThreads()
+  }, [fetchThreads])
+
+  const threadList = Object.values(threads)
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
+      {loading && <Text style={{ padding: 16 }}>Loading...</Text>}
       <FlatList
-        data={threads}
+        data={threadList}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
           <TouchableOpacity onPress={() => router.push(`/protected/home/${item.id}`)}>
