@@ -15,7 +15,9 @@ export default function ContactsScreen() {
 
   return (
     <>
-      {loading && <Text style={{ padding: 16 }}>Loading...</Text>}
+      {loading && contactList.length === 0 && (
+        <Text style={{ padding: 16 }}>Loading...</Text>
+      )}
       <FlatList
         data={contactList}
         keyExtractor={(item) => item.id}
@@ -29,6 +31,8 @@ export default function ContactsScreen() {
             </View>
           </TouchableOpacity>
         )}
+        refreshing={loading}
+        onRefresh={fetchContacts}
       />
     </>
   )

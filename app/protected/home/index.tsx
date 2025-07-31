@@ -15,7 +15,9 @@ export default function ThreadListScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      {loading && <Text style={{ padding: 16 }}>Loading...</Text>}
+      {loading && threadList.length === 0 && (
+        <Text style={{ padding: 16 }}>Loading...</Text>
+      )}
       <FlatList
         data={threadList}
         keyExtractor={(item) => item.id.toString()}
@@ -27,6 +29,8 @@ export default function ThreadListScreen() {
             </View>
           </TouchableOpacity>
         )}
+        refreshing={loading}
+        onRefresh={fetchThreads}
       />
     </SafeAreaView>
   )

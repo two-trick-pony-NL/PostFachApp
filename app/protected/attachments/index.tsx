@@ -22,7 +22,7 @@ export default function AttachmentsScreen() {
         data={attachmentList}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-        <TouchableOpacity onPress={() => router.push(`/protected/attachments/${item.id}`)}>    
+          <TouchableOpacity onPress={() => router.push(`/protected/attachments/${item.id}`)}>
             <View style={{ padding: 16 }}>
               <Text style={{ fontWeight: 'bold' }}>{item.filename}</Text>
               <Text>{item.mime_type}</Text>
@@ -30,6 +30,8 @@ export default function AttachmentsScreen() {
             </View>
           </TouchableOpacity>
         )}
+        refreshing={loading}
+        onRefresh={fetchAttachments}
       />
     </View>
   )

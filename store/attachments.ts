@@ -1,5 +1,7 @@
 import { create } from 'zustand'
-import { listAttachments, getAttachmentById } from '../lib/api' // Add getAttachmentById
+import { persist, createJSONStorage } from 'zustand/middleware'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { listAttachments, getAttachmentById } from '../lib/api'
 
 export interface Attachment {
   id: string
@@ -26,50 +28,59 @@ interface AttachmentStore {
   clearAttachments: () => void
 }
 
-export const useAttachmentStore = create<AttachmentStore>((set, get) => ({
-  attachments: [],
-  loading: false,
+export const useAttachmentStore = create<AttachmentStore>()(
+  persist(
+    (set, get) => ({
+      attachments: [],
+      loading: false,
 
-  fetchAttachments: async () => {
-    set({ loading: true })
-    try {
-      const data = await listAttachments()
-      set({ attachments: data })
-    } catch (e) {
-      console.error('Failed to fetch attachments', e)
-    } finally {
-      set({ loading: false })
+      fetchAttachments: async () => {
+        if (get().attachments.length > 0) return // skip loading if cached
+        set({ loading: true })
+        try {
+          const data = await listAttachments()
+          set({ attachments: data })
+        } catch (e) {
+          console.error('Failed to fetch attachments', e)
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      fetchAttachmentById: async (id: string) => {
+        const existing = get().attachments.find((a) => a.id === id)
+        if (existing) return existing
+
+        try {
+          const attachment = await getAttachmentById(id)
+          set((state) => ({
+            attachments: [...state.attachments, attachment],
+          }))
+          return attachment
+        } catch (error) {
+          console.error('Failed to fetch attachment by id', error)
+          return undefined
+        }
+      },
+
+      setAttachments: (attachments) => set({ attachments }),
+      addAttachment: (attachment) =>
+        set((state) => ({ attachments: [...state.attachments, attachment] })),
+      updateAttachment: (id, data) =>
+        set((state) => ({
+          attachments: state.attachments.map((a) =>
+            a.id === id ? { ...a, ...data } : a
+          ),
+        })),
+      removeAttachment: (id) =>
+        set((state) => ({
+          attachments: state.attachments.filter((a) => a.id !== id),
+        })),
+      clearAttachments: () => set({ attachments: [] }),
+    }),
+    {
+      name: 'attachments-storage',
+      storage: createJSONStorage(() => AsyncStorage),
     }
-  },
-
-  fetchAttachmentById: async (id: string) => {
-    const existing = get().attachments.find((a) => a.id === id)
-    if (existing) return existing
-
-    try {
-      const attachment = await getAttachmentById(id)
-      set((state) => ({
-        attachments: [...state.attachments, attachment],
-      }))
-      return attachment
-    } catch (error) {
-      console.error('Failed to fetch attachment by id', error)
-      return undefined
-    }
-  },
-
-  setAttachments: (attachments) => set({ attachments }),
-  addAttachment: (attachment) =>
-    set((state) => ({ attachments: [...state.attachments, attachment] })),
-  updateAttachment: (id, data) =>
-    set((state) => ({
-      attachments: state.attachments.map((a) =>
-        a.id === id ? { ...a, ...data } : a
-      ),
-    })),
-  removeAttachment: (id) =>
-    set((state) => ({
-      attachments: state.attachments.filter((a) => a.id !== id),
-    })),
-  clearAttachments: () => set({ attachments: [] }),
-}))
+  )
+)

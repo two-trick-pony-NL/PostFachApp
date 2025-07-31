@@ -1,13 +1,13 @@
 // store/threads.ts
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, StorageValue } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { getThreads, getThreadById } from '../lib/api'
 
 type Thread = {
   id: number
   subject: string
-  // Add other fields as needed
+  // Extend as needed
 }
 
 type ThreadState = {
@@ -18,16 +18,30 @@ type ThreadState = {
   clearThreads: () => void
 }
 
+// AsyncStorage wrapper
 const asyncStorage = {
-  getItem: async (key: string) => {
-    const value = await AsyncStorage.getItem(key)
-    return value ? JSON.parse(value) : null
+  getItem: async (key: string): Promise<StorageValue<ThreadState> | null> => {
+    try {
+      const value = await AsyncStorage.getItem(key)
+      return value ? JSON.parse(value) : null
+    } catch (e) {
+      console.warn(`[AsyncStorage] Failed to get ${key}`, e)
+      return null
+    }
   },
-  setItem: async (key: string, value: any) => {
-    await AsyncStorage.setItem(key, JSON.stringify(value))
+  setItem: async (key: string, value: StorageValue<ThreadState>) => {
+    try {
+      await AsyncStorage.setItem(key, JSON.stringify(value))
+    } catch (e) {
+      console.warn(`[AsyncStorage] Failed to set ${key}`, e)
+    }
   },
   removeItem: async (key: string) => {
-    await AsyncStorage.removeItem(key)
+    try {
+      await AsyncStorage.removeItem(key)
+    } catch (e) {
+      console.warn(`[AsyncStorage] Failed to remove ${key}`, e)
+    }
   },
 }
 
@@ -37,40 +51,43 @@ export const useThreadStore = create<ThreadState>()(
       threads: {},
       loading: false,
 
-    fetchThreads: async () => {
-    set({ loading: true })
-    try {
-        console.log('Fetching threads from API')
-        const data = await getThreads()
-        const threadMap = Object.fromEntries(data.map((t: Thread) => [t.id, t]))
-        set({ threads: threadMap })
-    } finally {
-        set({ loading: false })
-    }
-    },
+      fetchThreads: async () => {
+        if (Object.keys(get().threads).length === 0) {
+          set({ loading: true })
+        }
+        try {
+          const data = await getThreads()
+          const threadMap = Object.fromEntries(data.map((t: Thread) => [t.id, t]))
+          set({ threads: threadMap })
+        } finally {
+          set({ loading: false })
+        }
+      },
 
-
-    fetchThreadById: async (id: number) => {
-    const cached = get().threads[id]
-    if (cached) {
-        console.log(`Thread ${id} served from cache`)
-        return cached
-    }
-
-    console.log(`Thread ${id} fetching from API`)
-    const thread = await getThreadById(id)
-    set((state) => ({
-        threads: { ...state.threads, [id]: thread },
-    }))
-    return thread
-    },
-
+      fetchThreadById: async (id: number) => {
+        const cached = get().threads[id]
+        if (cached) {
+          console.log(`Thread ${id} served from cache`)
+          return cached
+        }
+        set({ loading: true })
+        try {
+          const thread = await getThreadById(id)
+          set((state) => ({
+            threads: { ...state.threads, [id]: thread },
+          }))
+          return thread
+        } finally {
+          set({ loading: false })
+        }
+      },
 
       clearThreads: () => set({ threads: {} }),
     }),
     {
       name: 'threads-storage',
       storage: asyncStorage,
+      skipHydration: true,
     }
   )
 )

@@ -1,4 +1,7 @@
-import create from 'zustand'
+// store/email.ts
+import { create } from 'zustand'
+import { persist, StorageValue } from 'zustand/middleware'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export interface Contact {
   id: string
@@ -63,16 +66,54 @@ interface EmailStore {
   clearEmail: () => void
 }
 
-export const useEmailStore = create<EmailStore>((set) => ({
-  email: null,
-  setEmail: (email) => set({ email }),
-  markRead: (read) =>
-    set((state) => state.email ? { email: { ...state.email, is_read: read } } : {}),
-  toggleStar: () =>
-    set((state) =>
-      state.email
-        ? { email: { ...state.email, is_starred: !state.email.is_starred } }
-        : {}
-    ),
-  clearEmail: () => set({ email: null }),
-}))
+// AsyncStorage wrapper for persist
+const asyncStorage = {
+  getItem: async (key: string): Promise<StorageValue<EmailStore> | null> => {
+    try {
+      const value = await AsyncStorage.getItem(key)
+      return value ? JSON.parse(value) : null
+    } catch (e) {
+      console.warn(`[AsyncStorage] Failed to get ${key}`, e)
+      return null
+    }
+  },
+  setItem: async (key: string, value: StorageValue<EmailStore>) => {
+    try {
+      await AsyncStorage.setItem(key, JSON.stringify(value))
+    } catch (e) {
+      console.warn(`[AsyncStorage] Failed to set ${key}`, e)
+    }
+  },
+  removeItem: async (key: string) => {
+    try {
+      await AsyncStorage.removeItem(key)
+    } catch (e) {
+      console.warn(`[AsyncStorage] Failed to remove ${key}`, e)
+    }
+  },
+}
+
+export const useEmailStore = create<EmailStore>()(
+  persist(
+    (set, get) => ({
+      email: null,
+      setEmail: (email) => set({ email }),
+      markRead: (read) =>
+        set((state) =>
+          state.email ? { email: { ...state.email, is_read: read } } : {}
+        ),
+      toggleStar: () =>
+        set((state) =>
+          state.email
+            ? { email: { ...state.email, is_starred: !state.email.is_starred } }
+            : {}
+        ),
+      clearEmail: () => set({ email: null }),
+    }),
+    {
+      name: 'email-storage',
+      storage: asyncStorage,
+      skipHydration: true,
+    }
+  )
+)
