@@ -34,18 +34,18 @@ export const useAttachmentStore = create<AttachmentStore>()(
       attachments: [],
       loading: false,
 
-      fetchAttachments: async () => {
-        if (get().attachments.length > 0) return // skip loading if cached
-        set({ loading: true })
-        try {
-          const data = await listAttachments()
-          set({ attachments: data })
-        } catch (e) {
-          console.error('Failed to fetch attachments', e)
-        } finally {
-          set({ loading: false })
-        }
-      },
+    fetchAttachments: async () => {
+      set({ loading: true })
+      try {
+        const data = await listAttachments()
+        set({ attachments: data })
+      } catch (e) {
+        console.error('Failed to fetch attachments', e)
+      } finally {
+        set({ loading: false })
+      }
+    },
+
 
       fetchAttachmentById: async (id: string) => {
         const existing = get().attachments.find((a) => a.id === id)

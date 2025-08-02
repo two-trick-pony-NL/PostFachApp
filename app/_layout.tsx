@@ -18,7 +18,7 @@ export default function RootLayout() {
     if (!isLoggedIn && pathname !== '/login') {
       router.replace('/login')
     } else if (isLoggedIn && pathname === '/login') {
-      router.replace('/protected/home')
+      router.replace('/protected/mailbox')
     }
   }, [isLoggedIn, pathname, isReady])
 

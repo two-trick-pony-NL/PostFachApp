@@ -13,7 +13,7 @@ export default function IndexRedirect() {
 
     checkSession().then(() => {
       if (useAuthStore.getState().isLoggedIn) {
-        router.replace('/protected/home')
+        router.replace('/protected/mailbox')
       } else {
         router.replace('/login')
       }
