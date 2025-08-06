@@ -1,20 +1,51 @@
-// store/threads.ts
 import { create } from 'zustand'
 import { persist, StorageValue } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { getThreads, getThreadById } from '../lib/api'
 
-type Thread = {
-  id: number
-  subject: string
+// Types
+export interface Contact {
+  id: string
+  email: string
+  display_name: string
+  notification_preference: 'default' | string
+  is_marked_as_spam: boolean
+}
+
+export interface Email {
+  id: string
+  from_email: string
+  from_contact: Contact
   // Extend as needed
 }
 
+export interface Thread {
+  id: string
+  subject: string
+  created_at: string
+  muted: boolean
+  is_snoozed: boolean
+  snoozed_until: string | null
+  is_archived: boolean
+  is_trashed: boolean
+  thread_starter_contact: Contact
+  number_of_emails: number
+  number_of_contacts: number
+  emails: Email[]
+}
+
+interface ThreadResponse {
+  count: number
+  next: string | null
+  previous: string | null
+  results: Thread[]
+}
+
 type ThreadState = {
-  threads: Record<number, Thread>
+  threads: Record<string, Thread>
   loading: boolean
   fetchThreads: () => Promise<void>
-  fetchThreadById: (id: number) => Promise<Thread | undefined>
+  fetchThreadById: (id: string) => Promise<Thread | undefined>
   clearThreads: () => void
 }
 
@@ -45,6 +76,7 @@ const asyncStorage = {
   },
 }
 
+// Store
 export const useThreadStore = create<ThreadState>()(
   persist(
     (set, get) => ({
@@ -56,15 +88,17 @@ export const useThreadStore = create<ThreadState>()(
           set({ loading: true })
         }
         try {
-          const data = await getThreads()
-          const threadMap = Object.fromEntries(data.map((t: Thread) => [t.id, t]))
+          const response: ThreadResponse = await getThreads()
+          const threadMap: Record<string, Thread> = Object.fromEntries(
+            response.results.map((t) => [t.id, t])
+          )
           set({ threads: threadMap })
         } finally {
           set({ loading: false })
         }
       },
 
-      fetchThreadById: async (id: number) => {
+      fetchThreadById: async (id: string) => {
         const cached = get().threads[id]
         if (cached) {
           console.log(`Thread ${id} served from cache`)
@@ -72,7 +106,7 @@ export const useThreadStore = create<ThreadState>()(
         }
         set({ loading: true })
         try {
-          const thread = await getThreadById(id)
+          const thread: Thread = await getThreadById(id)
           set((state) => ({
             threads: { ...state.threads, [id]: thread },
           }))

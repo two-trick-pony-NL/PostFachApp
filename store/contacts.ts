@@ -1,5 +1,5 @@
+// store/contacts.ts
 import { create } from 'zustand'
-import { persist, StorageValue } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { listContacts } from '../lib/api'
 
@@ -7,93 +7,54 @@ export interface Contact {
   id: string
   email: string
   display_name: string
-  always_notify: boolean
-  muted: boolean
-  marked_as_spam: boolean
-  important: boolean
-  whitelist: boolean
+  notification_preference: string
+  is_marked_as_spam: boolean
 }
 
-interface ContactsStore {
+interface ContactsState {
   contacts: Contact[]
   loading: boolean
+  error: string | null
   fetchContacts: () => Promise<void>
-  setContacts: (contacts: Contact[]) => void
-  addContact: (contact: Contact) => void
-  updateContact: (id: string, data: Partial<Contact>) => void
-  removeContact: (id: string) => void
-  clearContacts: () => void
+  markAsSpam: (id: string) => Promise<void>
+  loadContactsFromStorage: () => Promise<void>
 }
 
-const asyncStorage = {
-  getItem: async (key: string): Promise<StorageValue<ContactsStore> | null> => {
+const STORAGE_KEY = 'contacts'
+
+export const useContactsStore = create<ContactsState>((set, get) => ({
+  contacts: [],
+  loading: false,
+  error: null,
+
+  loadContactsFromStorage: async () => {
     try {
-      const value = await AsyncStorage.getItem(key)
-      return value ? JSON.parse(value) : null
-    } catch (e) {
-      console.warn(`[AsyncStorage] Failed to get ${key}`, e)
-      return null
+      const stored = await AsyncStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        set({ contacts: JSON.parse(stored) })
+      }
+    } catch (err) {
+      console.error('Failed to load contacts from storage', err)
     }
   },
-  setItem: async (key: string, value: StorageValue<ContactsStore>) => {
+
+  fetchContacts: async () => {
+    set({ loading: true, error: null })
     try {
-      await AsyncStorage.setItem(key, JSON.stringify(value))
-    } catch (e) {
-      console.warn(`[AsyncStorage] Failed to set ${key}`, e)
+      const data = await listContacts()
+      const results = data.results || []
+      set({ contacts: results, loading: false })
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(results))
+    } catch (err: any) {
+      set({ error: err.message || 'Failed to fetch contacts', loading: false })
     }
   },
-  removeItem: async (key: string) => {
-    try {
-      await AsyncStorage.removeItem(key)
-    } catch (e) {
-      console.warn(`[AsyncStorage] Failed to remove ${key}`, e)
-    }
+
+  markAsSpam: async (id: string) => {
+    const updated = get().contacts.map(contact =>
+      contact.id === id ? { ...contact, is_marked_as_spam: true } : contact
+    )
+    set({ contacts: updated })
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
   },
-}
-
-export const useContactsStore = create<ContactsStore>()(
-  persist(
-    (set, get) => ({
-      contacts: [],
-      loading: false,
-
-      fetchContacts: async () => {
-        const contacts = get().contacts
-        if (contacts.length === 0) {
-          set({ loading: true }) // only show loading if store is empty
-        }
-        try {
-          const freshContacts = await listContacts()
-          set({ contacts: freshContacts })
-        } finally {
-          set({ loading: false })
-        }
-      },
-
-      setContacts: (contacts) => set({ contacts }),
-
-      addContact: (contact) =>
-        set((state) => ({
-          contacts: [...state.contacts, contact],
-        })),
-
-      updateContact: (id, data) =>
-        set((state) => ({
-          contacts: state.contacts.map((c) =>
-            c.id === id ? { ...c, ...data } : c
-          ),
-        })),
-
-      removeContact: (id) =>
-        set((state) => ({
-          contacts: state.contacts.filter((c) => c.id !== id),
-        })),
-
-      clearContacts: () => set({ contacts: [] }),
-    }),
-    {
-      name: 'contacts-storage',
-      storage: asyncStorage,
-    }
-  )
-)
+}))

@@ -1,32 +1,37 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   View,
   Text,
   SectionList,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
+  ActivityIndicator,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { useContactsStore } from '../../../store/contacts'
-import { Star, VolumeX, ShieldCheck } from 'lucide-react-native'
+import { useContactsStore, Contact } from '../../../store/contacts'
+import { Bell, BellOff, ShieldOff } from 'lucide-react-native'
 
 const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
-const ITEM_HEIGHT = 60
 
 export default function ContactsScreen() {
-  const { contacts, fetchContacts, loading } = useContactsStore()
+  const { contacts, fetchContacts, loadContactsFromStorage, loading } = useContactsStore()
   const router = useRouter()
   const sectionListRef = useRef<SectionList>(null)
+  const [initialLoading, setInitialLoading] = useState(true)
 
   useEffect(() => {
-    fetchContacts()
-  }, [fetchContacts])
+    const init = async () => {
+      await loadContactsFromStorage()
+      await fetchContacts()
+      setInitialLoading(false)
+    }
+    init()
+  }, [])
 
   const sections = useMemo(() => {
-    const grouped: Record<string, any[]> = {}
+    const grouped: Record<string, Contact[]> = {}
 
-    Object.values(contacts).forEach((contact) => {
+    contacts.forEach((contact) => {
       const key = (contact.display_name || contact.email)[0]?.toUpperCase() || '#'
       if (!grouped[key]) grouped[key] = []
       grouped[key].push(contact)
@@ -53,6 +58,23 @@ export default function ContactsScreen() {
     }
   }
 
+  if (initialLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007aff" />
+        <Text style={{ marginTop: 8 }}>Loading contacts...</Text>
+      </View>
+    )
+  }
+
+  if (!loading && contacts.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>No contacts found.</Text>
+      </View>
+    )
+  }
+
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
       <SectionList
@@ -63,30 +85,30 @@ export default function ContactsScreen() {
           <Text style={styles.sectionHeader}>{section.title}</Text>
         )}
         renderItem={({ item }) => (
-        <TouchableOpacity
-          onPress={() => router.push(`/protected/contacts/${item.id}`)}
-          style={styles.itemContainer}
-        >
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {(item.display_name || item.email)
-              .replace(/[^a-zA-Z0-9]/g, '') // remove special chars
-              .slice(0, 2)
-              .toUpperCase()}
-          </Text>
-        </View>
+          <TouchableOpacity
+            onPress={() => router.push(`/protected/contacts/${item.id}`)}
+            style={styles.itemContainer}
+          >
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {(item.display_name || item.email)
+                  .replace(/[^a-zA-Z0-9]/g, '')
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </Text>
+            </View>
 
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{item.display_name || item.email}</Text>
-            {item.display_name && <Text style={styles.email}>{item.email}</Text>}
-          </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>{item.display_name || item.email}</Text>
+              {item.display_name && <Text style={styles.email}>{item.email}</Text>}
+            </View>
 
-          <View style={styles.icons}>
-            {item.important && <Star color="gold" size={20} />}
-            {item.muted && <VolumeX color="gray" size={20} />}
-            {item.whitelist && <ShieldCheck color="green" size={20} />}
-          </View>
-        </TouchableOpacity>
+            <View style={styles.icons}>
+              {item.is_marked_as_spam && <ShieldOff color="red" size={20} />}
+              {item.notification_preference === 'always_notify' && <Bell color="green" size={20} />}
+              {item.notification_preference === 'muted' && <BellOff color="gray" size={20} />}
+            </View>
+          </TouchableOpacity>
         )}
         refreshing={loading}
         onRefresh={fetchContacts}
@@ -157,5 +179,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingVertical: 2,
     color: '#888',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 })

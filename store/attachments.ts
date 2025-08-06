@@ -1,86 +1,98 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
+import { persist, StorageValue } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { listAttachments, getAttachmentById } from '../lib/api'
 
+// Types
 export interface Attachment {
   id: string
   filename: string
-  mime_type: string
+  content_type: string
   size: number
-  download_count: number
-  share_url_expiry: string
   created_at: string
-  updated_at: string
-  share_url: string
-  private_file_url: string
+  private_file_url?: string
+  // add more fields if needed
 }
 
-interface AttachmentStore {
-  attachments: Attachment[]
+interface AttachmentState {
+  attachments: Record<string, Attachment>
   loading: boolean
   fetchAttachments: () => Promise<void>
   fetchAttachmentById: (id: string) => Promise<Attachment | undefined>
-  setAttachments: (attachments: Attachment[]) => void
-  addAttachment: (attachment: Attachment) => void
-  updateAttachment: (id: string, data: Partial<Attachment>) => void
-  removeAttachment: (id: string) => void
   clearAttachments: () => void
 }
 
-export const useAttachmentStore = create<AttachmentStore>()(
+// AsyncStorage wrapper
+const asyncStorage = {
+  getItem: async (key: string): Promise<StorageValue<AttachmentState> | null> => {
+    try {
+      const value = await AsyncStorage.getItem(key)
+      return value ? JSON.parse(value) : null
+    } catch (e) {
+      console.warn(`[AsyncStorage] Failed to get ${key}`, e)
+      return null
+    }
+  },
+  setItem: async (key: string, value: StorageValue<AttachmentState>) => {
+    try {
+      await AsyncStorage.setItem(key, JSON.stringify(value))
+    } catch (e) {
+      console.warn(`[AsyncStorage] Failed to set ${key}`, e)
+    }
+  },
+  removeItem: async (key: string) => {
+    try {
+      await AsyncStorage.removeItem(key)
+    } catch (e) {
+      console.warn(`[AsyncStorage] Failed to remove ${key}`, e)
+    }
+  },
+}
+
+// Store
+export const useAttachmentStore = create<AttachmentState>()(
   persist(
     (set, get) => ({
-      attachments: [],
+      attachments: {},
       loading: false,
 
-    fetchAttachments: async () => {
-      set({ loading: true })
-      try {
-        const data = await listAttachments()
-        set({ attachments: data })
-      } catch (e) {
-        console.error('Failed to fetch attachments', e)
-      } finally {
-        set({ loading: false })
-      }
-    },
-
-
-      fetchAttachmentById: async (id: string) => {
-        const existing = get().attachments.find((a) => a.id === id)
-        if (existing) return existing
-
+      fetchAttachments: async () => {
+        if (Object.keys(get().attachments).length === 0) {
+          set({ loading: true })
+        }
         try {
-          const attachment = await getAttachmentById(id)
-          set((state) => ({
-            attachments: [...state.attachments, attachment],
-          }))
-          return attachment
-        } catch (error) {
-          console.error('Failed to fetch attachment by id', error)
-          return undefined
+          const data = await listAttachments()
+          const map: Record<string, Attachment> = Object.fromEntries(
+            data.map((att) => [att.id, att])
+          )
+          set({ attachments: map })
+        } finally {
+          set({ loading: false })
         }
       },
 
-      setAttachments: (attachments) => set({ attachments }),
-      addAttachment: (attachment) =>
-        set((state) => ({ attachments: [...state.attachments, attachment] })),
-      updateAttachment: (id, data) =>
-        set((state) => ({
-          attachments: state.attachments.map((a) =>
-            a.id === id ? { ...a, ...data } : a
-          ),
-        })),
-      removeAttachment: (id) =>
-        set((state) => ({
-          attachments: state.attachments.filter((a) => a.id !== id),
-        })),
-      clearAttachments: () => set({ attachments: [] }),
+      fetchAttachmentById: async (id: string) => {
+        const cached = get().attachments[id]
+        if (cached) return cached
+
+        set({ loading: true })
+        try {
+          const att = await getAttachmentById(id)
+          set((state) => ({
+            attachments: { ...state.attachments, [id]: att },
+          }))
+          return att
+        } finally {
+          set({ loading: false })
+        }
+      },
+
+      clearAttachments: () => set({ attachments: {} }),
     }),
     {
       name: 'attachments-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: asyncStorage,
+      skipHydration: true,
     }
   )
 )
